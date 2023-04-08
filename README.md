@@ -1,9 +1,7 @@
-# \[Group name\]
+# Amalietokk
 
 **Group members:**
-- A
-- B
-- C
+- Amalie Tokkesdal
 
 This repository contains  
 1. Inaugural project. 
