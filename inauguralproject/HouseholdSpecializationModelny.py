@@ -54,20 +54,29 @@ class HouseholdSpecializationModelClass:
         C = par.wM*LM + par.wF*LF
 
         # b. home production
-        H = HM**(1-par.alpha)*HF**par.alpha
+        if par.sigma == 0:
+            H = np.fmin(HM, HF)
+        elif par.sigma == 1:
+            H = HM**(1-par.alpha)*HF**par.alpha
+        else:
+            HM = np.fmax(1e-9,HM)
+            HF = np.fmax(1e-9,HF)
+            H = ((1-par.alpha)*HM**((par.sigma-1)/(par.sigma)) + par.alpha*HF**((par.sigma-1)/(par.sigma)))**(par.sigma/(par.sigma-1))
 
         # c. total consumption utility
         Q = C**par.omega*H**(1-par.omega)
         utility = np.fmax(Q,1e-8)**(1-par.rho)/(1-par.rho)
 
-        # d. disutlity of work
+        # d. disutility of work
         epsilon_ = 1+1/par.epsilon
         TM = LM+HM
         TF = LF+HF
         disutility = par.nu*(TM**epsilon_/epsilon_+TF**epsilon_/epsilon_)
         
-        return utility - disutility
-
+        return utility - disutility  
+    
+    
+    
     def solve_discrete(self,do_print=False):
         """ solve model discretely """
         
@@ -117,10 +126,8 @@ class HouseholdSpecializationModelClass:
         bounds=((0,24),(0,24),(0,24),(0,24))
         
         def objective_function(x):
-            if x[0] + x[1] > 24 or x[2] + x[3] > 24:
-                return -self.calc_utility(x[0],x[1],x[2],x[3]) - penalty
-            else:
-                return -self.calc_utility(x[0],x[1],x[2],x[3])
+            LM, HM, LF, HF = x
+            return -self.calc_utility(LM, HM, LF, HF)
 
         # d. find maximizing argument
         optimal = optimize.minimize(objective_function, x0=guess, method="Nelder-Mead", bounds=bounds)
@@ -168,5 +175,44 @@ class HouseholdSpecializationModelClass:
     
     def estimate(self,alpha=None,sigma=None):
         """ estimate alpha and sigma """
+        par = self.par
+        sol = self.sol
+        
+        def error(x):
+            par.alpha, par.sigma = x
+            self.solve_wF_vec()
+            self.run_regression()
+            err = (par.beta0_target-sol.beta0)**2  + (par.beta1_target-sol.beta1)**2
+            return err
+        #Initial guess:
+        ini = [0.5,0.5]
+ #       bounds = [(0.0001,1.0),(0.0001,1.0)]
+        solution = optimize.minimize(error, ini, method='Nelder-Mead')
+        alpha, sigma = solution.x
+        return alpha, sigma
+    
+    
+#    def estimate(self,alpha=None,sigma=None):
+#        """ estimate alpha and sigma """
+#        
+#        par = self.par
+#        sol = self.sol
 
-        pass
+        # define objective function to minimize
+#        def objective(x):
+#            alpha, sigma = x
+#            par.alpha = alpha
+#            par.sigma = sigma
+#            self.solve_wF_vec()
+#            self.run_regression()
+#            return (par.beta0_target - sol.beta0)**2+(par.beta1_target - sol.beta1)**2
+#        
+#        # initial guess
+#        initial_guess = [0.5, 1.0]
+
+        # call solver
+#        solution = optimize.minimize(objective, initial_guess, method='Nelder-Mead')
+
+#        alpha_min, sigma_min = solution.x
+
+#        return alpha_min, sigma_min 
